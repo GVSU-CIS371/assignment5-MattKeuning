@@ -71,7 +71,13 @@
     </ul>
 
     <div class="auth-row">
-      <button @click="withGoogle">Sign in with Google</button>
+      <template v-if="!beverageStore.user">
+        <button @click="withGoogle">Sign in with Google</button>
+      </template>
+      <template v-else>
+        <span class="user-label">Welcome, {{ beverageStore.user.displayName || beverageStore.user.email }}</span>
+        <button @click="signOutUser">Sign out</button>
+      </template>
     </div>
     <input
       v-model="beverageStore.currentName"
@@ -79,14 +85,14 @@
       placeholder="Beverage Name"
     />
 
-    <button @click="handleMakeBeverage">🍺 Make Beverage</button>
+    <button @click="handleMakeBeverage" :disabled="!beverageStore.user">🍺 Make Beverage</button>
 
     <p v-if="message" class="status-message">
       {{ message }}
     </p>
   </div>
 
-  <div style="margin-top: 20px">
+  <div v-if="beverageStore.user && beverageStore.beverages.length > 0" style="margin-top: 20px">
     <template v-for="beverage in beverageStore.beverages" :key="beverage.id">
       <input
         type="radio"
@@ -101,12 +107,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
+import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import Beverage from "./components/Beverage.vue";
 import { useBeverageStore } from "./stores/beverageStore";
+import { auth, googleProvider } from "./firebase";
 
 const beverageStore = useBeverageStore();
 beverageStore.init();
+
+onMounted(() => {
+  onAuthStateChanged(auth, (user) => {
+    beverageStore.setUser(user);
+  });
+});
 
 const message = ref("");
 
@@ -117,7 +131,17 @@ const showMessage = (txt: string) => {
   }, 5000);
 };
 
-const withGoogle = async () => {};
+const withGoogle = async () => {
+  try {
+    await signInWithPopup(auth, googleProvider);
+  } catch (error: any) {
+    showMessage("Login failed: " + error.message);
+  }
+};
+
+const signOutUser = async () => {
+  await signOut(auth);
+};
 
 const handleMakeBeverage = () => {
   const txt = beverageStore.makeBeverage();

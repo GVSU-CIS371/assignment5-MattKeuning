@@ -145,7 +145,45 @@ export const useBeverageStore = defineStore("BeverageStore", {
         this.currentSyrup
       );
     },
-    makeBeverage() {},
-    setUser(user: User | null) {},
+    makeBeverage() {
+      if (!this.user) {
+        return "No user logged in, please sign in first.";
+      }
+      if (!this.currentBase || !this.currentCreamer || !this.currentSyrup || !this.currentName.trim()) {
+        return "Please complete all beverage options and the name before making a beverage.";
+      }
+      const newBeverage: BeverageType = {
+        id: Date.now().toString(),
+        uid: this.user.uid,
+        name: this.currentName,
+        temp: this.currentTemp,
+        base: this.currentBase,
+        syrup: this.currentSyrup,
+        creamer: this.currentCreamer,
+      };
+      setDoc(doc(db, "beverages", newBeverage.id), newBeverage);
+      this.beverages.push(newBeverage);
+      this.currentBeverage = newBeverage;
+      this.currentName = "";
+      return `Beverage ${newBeverage.name} made successfully!`;
+    },
+    setUser(user: User | null) {
+      this.user = user;
+      if (this.snapshotUnsubscribe) {
+        this.snapshotUnsubscribe();
+        this.snapshotUnsubscribe = null;
+      }
+      if (user) {
+        const q = query(collection(db, "beverages"), where("uid", "==", user.uid));
+        this.snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
+          this.beverages = snapshot.docs.map(doc => doc.data() as BeverageType);
+          this.currentBeverage = this.beverages[0] || null;
+          this.showBeverage();
+        });
+      } else {
+        this.beverages = [];
+        this.currentBeverage = null;
+      }
+    },
   },
 });
